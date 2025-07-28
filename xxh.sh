@@ -28,14 +28,14 @@ calculate_hash() {
 # Calculate current hash
 current_hash=$(calculate_hash)
 
-header="Secure Shell Connections"
 FMENU=(
   fzf
   --tmux 95%,80%
-  --header="$header"
   --layout=reverse
   --border=bold
   --border=rounded
+  --border-label="Secure Shell Connections"
+  --border-label-pos=center
   --margin=5%
   --multi
   --color=dark
@@ -95,6 +95,8 @@ if [[ -n "$selected_row" ]]; then
 
   for i in "${selection_array[@]}"; do
     hostname=$(awk '{print $NF}' <<<"$i")
+    # kitten @ launch --type=tab --copy-env --tab-title "${hostname}" ssh $hostname
+    # kitten @ set-colors --match=recent:0 /Users/mpardue/.config/kitty/Borland.conf
     tmux new-window -n "${hostname}" ssh $hostname
   done
 fi
