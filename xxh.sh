@@ -38,7 +38,15 @@ FMENU=(
   --border-label-pos=center
   --margin=5%
   --multi
-  --color=dark
+  --color 'fg:7'
+  --color 'current-fg:13'
+  --color 'current-bg:-1'
+  --color 'pointer:6'
+  --color 'hl:13'
+  --color 'border:6'
+  --color 'label:13'
+  --color 'header:7'
+  --color 'prompt:7'
   --info=hidden
   --header-first
   --bind change:top
