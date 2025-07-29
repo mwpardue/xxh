@@ -18,7 +18,7 @@ hash_file="/tmp/ssh_config_hash"
 tw_file="/tmp/xxh_text_width"
 homedir=$HOME
 # columns=$(/usr/bin/tput cols)
-text_width=264
+text_width=200
 
 # Function to calculate MD5 hashes of the config files
 calculate_hash() {
@@ -30,13 +30,13 @@ current_hash=$(calculate_hash)
 
 FMENU=(
   fzf
-  --tmux 95%,80%
+  --tmux 68%,80%
   --layout=reverse
   --border=bold
   --border=rounded
   --border-label="Secure Shell Connections"
   --border-label-pos=center
-  --margin=5%
+  --margin=2%
   --multi
   --color 'fg:7'
   --color 'current-fg:13'
@@ -93,7 +93,7 @@ else
   echo "$current_hash" >"$hash_file"
 fi
 
-selected_row=$(printf "%s\n" "${list[@]}" | "${FMENU[@]}" "Select session: ")
+selected_row=$(printf "%s\n" "${list[@]}" | "${FMENU[@]}" "Select host: ")
 if [[ -n "$selected_row" ]]; then
 
   selection_array=()
