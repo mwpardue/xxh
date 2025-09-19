@@ -86,9 +86,10 @@ FMENU=(
   --margin=2%
   --multi
   --color 'fg:7'
+  --color 'bg:233'
   --color 'current-fg:13'
-  --color 'current-bg:-1'
-  --color 'pointer:6'
+  --color 'current-bg:233'
+  --color 'pointer:13'
   --color 'hl:13'
   --color 'border:6'
   --color 'label:13'
