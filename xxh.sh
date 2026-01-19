@@ -1,4 +1,4 @@
-#!/usr/local/bin/bash
+#!/opt/homebrew/bin/bash
 
 s_flag=0
 
@@ -11,77 +11,17 @@ while getopts "s" opt; do
   esac
 done
 
-cache_file="/tmp/ssh_config_cache"
-hash_file="/tmp/ssh_config_hash"
-tw_file="/tmp/ssh_config_tw"
-
-homedir=$HOME
 client_width=$(tmux display-message -p '#{client_width}')
-text_width=$((($client_width * 40) / 100))
-
-# Function to calculate hash of .ssh directory
-calculate_hash() {
-  md5 ${homedir}/.ssh/config* 2>/dev/null | md5
-}
-
-# Build hosts list from .ssh directory
-list_hosts() {
-  local line=$2
-  local host
-  local desc
-
-  if [[ $line =~ ^Host.*#.* ]]; then
-    IFS=# read -r host desc <<<${line:5}
-    desc="${desc/_[A-Z]*_/}"
-    spaces=$(($text_width - ${#host} - ${#desc}))
-    space_string=$(printf '%*s' "$spaces")
-    row="${desc}${space_string}${host}"
-    list+=("$row")
-  fi
-
-  # Save the list to cache
-  printf "%s\n" "${list[@]}" >"$cache_file"
-
-  # Save the new hash
-  echo "$current_hash" >"$hash_file"
-}
-
-# Calculate current hash
-current_hash=$(calculate_hash)
-
-border_label="Secure Shell Connections"
-
-# Check if the cachefile exists and compare hashes
-if [[ -f "$cache_file" ]] && [[ "$text_width" == "$(cat "$tw_file")" ]] &&
-  [[ "$(cat "$hash_file")" == "$current_hash" ]]; then
-
-  # Cache is up to date, load the list from the cache
-  list=()
-  mapfile -t list <$cache_file
-else
-  # Cache is missing or hash doesn't match, rebuild list
-  declare -a list=()
-  border_label="Secure Shell Connections NEW"
-  echo "$text_width" >"$tw_file"
-
-  for file in ${homedir}/.ssh/config*; do
-    mapfile -t -C list_hosts -c 1 hosts <$file
-  done
-fi
-
-fzf_width=$(($text_width + 10))
-fzf_height=$((${#list[@]} + 6))
-client_height=$(($(tmux display-message -p '#{client_height}') - 6))
-
-((fzf_height > client_height)) && fzf_height=$client_height
+fzf_width=$(($client_width * 65 / 100))
+text_width=$(($fzf_width - 8))
 
 FMENU=(
   fzf
-  --tmux $(echo $fzf_width),$(echo $fzf_height)
+  --tmux 65%,80%
   --layout=reverse
   --border=bold
   --border=rounded
-  --border-label="${border_label}"
+  --border-label="Secure Shell Connections"
   --border-label-pos=center
   --margin=2%
   --multi
@@ -101,6 +41,31 @@ FMENU=(
   --prompt
 )
 
+dir="$HOME/.ssh"
+raw=()
+list=()
+
+for file in $dir/config*; do
+  [[ -f $file ]] || continue
+  while IFS= read -r line; do
+    if [[ $line =~ ^Host.*#.* ]]; then
+      raw+=("$line")
+    fi
+  done <"$file"
+done
+
+for record in "${raw[@]}"; do
+  host=${record:5}
+  host="${host%% #*}"
+  desc="${record##* #}"
+  desc="${desc/ _[A-Z]*_/}"
+  hostlength=${#host}
+  desclength=${#desc}
+  spaces=$((text_width - hostlength - desclength - 7))
+  space_string=$(printf '%*s' "$spaces")
+  list+=("$host$space_string$desc")
+done
+
 selected_row=$(printf "%s\n" "${list[@]}" | "${FMENU[@]}" "Select host: ")
 if [[ -n "$selected_row" ]]; then
 
@@ -109,8 +74,46 @@ if [[ -n "$selected_row" ]]; then
     selection_array+=("$line")
   done <<<"$selected_row"
 
-  for i in "${selection_array[@]}"; do
-    hostname=$(awk '{print $NF}' <<<"$i")
-    tmux new-window -n "${hostname}" ssh $hostname
-  done
+  if [[ s_flag -eq 1 ]]; then
+    list_length=${#selection_array[@]}
+    panes=4
+    windows=$((($list_length + panes - 1) / panes)) # Ceiling: 3 subsets (4+4+1)
+    window_idx=0
+    pos=0
+
+    ssh_new_window() {
+      target=$(tmux new-window -n "$1" -P -F '#{session_name}:#{window_index}' ssh $1)
+      sleep .5
+    }
+    ssh_new_pane() {
+      tmux split-window -t "$target" -h ssh $1
+      sleep .5
+    }
+
+    while [[ $window_idx -lt $windows ]]; do
+      for ((pos = 0; pos < panes && (window_idx * panes + pos) < list_length; pos++)); do
+        idx=$(((window_idx * panes + pos) % list_length)) # Modulo for cycling
+        item="${selection_array[$idx]}"
+        hostname="${item%% *}"
+        if [[ $pos -eq 0 ]]; then
+          ssh_new_window $hostname
+          continue
+        else
+          ssh_new_pane $hostname
+        fi
+      done
+      if [[ $list_length == 2 ]]; then
+        tmux select-layout -t "$target" even-horizontal
+      else
+        tmux select-layout -t "$target" tiled
+      fi
+      ((++window_idx))
+    done
+
+  else
+    for i in "${selection_array[@]}"; do
+      hostname="${i%% *}"
+      tmux new-window -n "${hostname}" ssh $hostname
+    done
+  fi
 fi
