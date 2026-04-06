@@ -26,10 +26,10 @@ FMENU=(
   --margin=2%
   --multi
   --color 'fg:7'
-  --color 'bg:233'
-  --color 'current-fg:13'
-  --color 'current-bg:233'
-  --color 'pointer:13'
+  --color 'bg:16'
+  --color 'current-fg:16'
+  --color 'current-bg:9'
+  --color 'pointer:3'
   --color 'hl:13'
   --color 'border:6'
   --color 'label:13'
