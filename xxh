@@ -11,35 +11,12 @@ while getopts "s" opt; do
   esac
 done
 
+LABEL=" Secure Shell Connections "
+if [[ s_flag -eq 1 ]]; then
+  LABEL=" Secure Shell Connections (Split-Windows) "
+fi
 client_width=$(tmux display-message -p '#{client_width}')
-fzf_width=$(($client_width * 65 / 100))
-text_width=$(($fzf_width - 8))
-
-FMENU=(
-  fzf
-  --tmux 65%,80%
-  --layout=reverse
-  --border=bold
-  --border=rounded
-  --border-label="Secure Shell Connections"
-  --border-label-pos=center
-  --margin=2%
-  --multi
-  --color 'fg:7'
-  --color 'bg:16'
-  --color 'current-fg:16'
-  --color 'current-bg:9'
-  --color 'pointer:3'
-  --color 'hl:13'
-  --color 'border:6'
-  --color 'label:13'
-  --color 'header:7'
-  --color 'prompt:7'
-  --info=hidden
-  --header-first
-  --bind change:top
-  --prompt
-)
+fzf_width=$(($client_width * 30 / 100))
 
 dir="$HOME/.ssh"
 raw=()
@@ -61,12 +38,45 @@ for record in "${raw[@]}"; do
   desc="${desc/ _[A-Z]*_/}"
   hostlength=${#host}
   desclength=${#desc}
-  spaces=$((text_width - hostlength - desclength - 7))
+  spaces=$((fzf_width - hostlength - desclength - 6))
   space_string=$(printf '%*s' "$spaces")
   list+=("$host$space_string$desc")
 done
 
-selected_row=$(printf "%s\n" "${list[@]}" | "${FMENU[@]}" "Select host: ")
+fzf_height=$((${#list[@]} + 4))
+FMENU=(
+  fzf
+  --tmux $fzf_width,$fzf_height
+  --layout=reverse
+  --margin=0,0
+  --padding=0,1,0,0
+  --border=sharp
+  --border=double
+  --border-label="$LABEL"
+  --border-label-pos=center
+  --no-info
+  --input-border=line
+  --no-separator
+  --pointer=''
+  --multi
+  --color 'fg:7'
+  --color 'bg:-1'
+  --color 'current-fg:16'
+  --color 'current-bg:10'
+  --color 'hl:9'
+  --color 'current-hl:9'
+  --color 'border:12'
+  --color 'label:11'
+  --color 'header:7'
+  --color 'prompt:11'
+  --color 'marker:11'
+  --color 'input-border:5'
+  --bind change:top
+  --ansi
+  --prompt
+)
+
+selected_row=$(printf "%s\n" "${list[@]}" | "${FMENU[@]}" "HOST> ")
 if [[ -n "$selected_row" ]]; then
 
   selection_array=()
