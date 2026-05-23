@@ -35,7 +35,6 @@ for record in "${raw[@]}"; do
   host=${record:5}
   host="${host%% #*}"
   desc="${record##* #}"
-  desc="${desc/ _[A-Z]*_/}"
   hostlength=${#host}
   desclength=${#desc}
   spaces=$((fzf_width - hostlength - desclength - 6))
