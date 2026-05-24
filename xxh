@@ -1,4 +1,4 @@
-#!/opt/homebrew/bin/bash
+#!/usr/bin/env bash
 
 s_flag=0
 
@@ -19,28 +19,16 @@ client_width=$(tmux display-message -p '#{client_width}')
 fzf_width=$(($client_width * 30 / 100))
 
 dir="$HOME/.ssh"
-raw=()
-list=()
 
-for file in $dir/config*; do
-  [[ -f $file ]] || continue
-  while IFS= read -r line; do
-    if [[ $line =~ ^Host.*#.* ]]; then
-      raw+=("$line")
-    fi
-  done <"$file"
-done
-
-for record in "${raw[@]}"; do
-  host=${record:5}
-  host="${host%% #*}"
-  desc="${record##* #}"
-  hostlength=${#host}
-  desclength=${#desc}
-  spaces=$((fzf_width - hostlength - desclength - 6))
-  space_string=$(printf '%*s' "$spaces")
-  list+=("$host$space_string$desc")
-done
+mapfile -t list < <(
+  grep -Ehs '^Host .*#' "$dir"/config* |
+    while IFS= read -r record; do
+      host=${record#Host }
+      host=${host%% #*}
+      desc=${record##* #}
+      printf "%s%*s\n" "$host" "$((fzf_width - ${#host} - 6))" "$desc"
+    done
+)
 
 fzf_height=$((${#list[@]} + 4))
 FMENU=(
