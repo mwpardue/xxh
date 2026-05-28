@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 
 s_flag=0
+SPLIT_KEY=";"
 
-while getopts "s" opt; do
+while getopts "sk:" opt; do
   case $opt in
   s)
     s_flag=1
+    ;;
+  k)
+    SPLIT_KEY="$OPTARG"
     ;;
   \?) ;;
   esac
@@ -16,18 +20,23 @@ if [[ s_flag -eq 1 ]]; then
   LABEL=" Secure Shell Connections (Split-Windows) "
 fi
 client_width=$(tmux display-message -p '#{client_width}')
-fzf_width=$(($client_width * 30 / 100))
+fzf_width=$(($client_width * 40 / 100))
 
 dir="$HOME/.ssh"
 
 mapfile -t list < <(
   grep -Ehs '^Host .*#' "$dir"/config* |
-    while IFS= read -r record; do
-      host=${record#Host }
-      host=${host%% #*}
-      desc=${record##* #}
-      printf "%s%*s\n" "$host" "$((fzf_width - ${#host} - 6))" "$desc"
-    done
+    awk -v width="$fzf_width" '{
+      host = $2
+      if (idx = index($0, " #")) {
+        desc = substr($0, idx + 2)
+      } else {
+        desc = host
+      }
+      padding = width - length(host) - 6
+      if (padding < 1) padding = 1
+      printf "%s%*s\n", host, padding, desc
+    }'
 )
 
 fzf_height=$((${#list[@]} + 4))
@@ -60,23 +69,38 @@ FMENU=(
   --color 'input-border:5'
   --bind change:top
   --ansi
+  --expect="$SPLIT_KEY"
   --prompt
 )
 
 selected_row=$(printf "%s\n" "${list[@]}" | "${FMENU[@]}" "HOST> ")
 if [[ -n "$selected_row" ]]; then
+  key=$(printf '%s\n' "$selected_row" | head -n1)
+  hosts_raw=$(printf '%s\n' "$selected_row" | tail -n +2)
 
   selection_array=()
   while IFS= read -r line; do
-    selection_array+=("$line")
-  done <<<"$selected_row"
+    [[ -n "$line" ]] && selection_array+=("$line")
+  done <<<"$hosts_raw"
 
-  if [[ s_flag -eq 1 ]]; then
+  if [[ "$key" == "$SPLIT_KEY" ]]; then
+    for i in "${selection_array[@]}"; do
+      hostname="${i%% *}"
+      tmux split-window -h ssh "$hostname"
+      sleep .3
+    done
+
+    if [[ ${#selection_array[@]} -le 2 ]]; then
+      tmux select-layout even-horizontal
+    else
+      tmux select-layout tiled
+    fi
+
+  elif [[ s_flag -eq 1 ]]; then
     list_length=${#selection_array[@]}
     panes=4
-    windows=$((($list_length + panes - 1) / panes)) # Ceiling: 3 subsets (4+4+1)
+    windows=$((($list_length + panes - 1) / panes))
     window_idx=0
-    pos=0
 
     ssh_new_window() {
       target=$(tmux new-window -n "$1" -P -F '#{session_name}:#{window_index}' ssh $1)
@@ -89,7 +113,7 @@ if [[ -n "$selected_row" ]]; then
 
     while [[ $window_idx -lt $windows ]]; do
       for ((pos = 0; pos < panes && (window_idx * panes + pos) < list_length; pos++)); do
-        idx=$(((window_idx * panes + pos) % list_length)) # Modulo for cycling
+        idx=$(((window_idx * panes + pos) % list_length))
         item="${selection_array[$idx]}"
         hostname="${item%% *}"
         if [[ $pos -eq 0 ]]; then
@@ -102,7 +126,7 @@ if [[ -n "$selected_row" ]]; then
       if [[ $list_length == 2 ]]; then
         tmux select-layout -t "$target" even-horizontal
       else
-        tmux select-layout -t "$target" tiled
+        tmux select-layout tiled
       fi
       ((++window_idx))
     done
