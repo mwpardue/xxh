@@ -25,7 +25,7 @@ fzf_width=$(($client_width * 40 / 100))
 dir="$HOME/.ssh"
 
 mapfile -t list < <(
-  grep -Ehs '^Host .*#' "$dir"/config* |
+  grep -Ehs '^Host .*#' "$dir"/config* "$dir"/config.d/config* |
     awk -v width="$fzf_width" '{
       host = $2
       if (idx = index($0, " #")) {
