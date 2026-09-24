@@ -111,25 +111,33 @@ if [[ -n "$selected_row" ]]; then
       sleep .5
     }
 
-    while [[ $window_idx -lt $windows ]]; do
-      for ((pos = 0; pos < panes && (window_idx * panes + pos) < list_length; pos++)); do
-        idx=$(((window_idx * panes + pos) % list_length))
-        item="${selection_array[$idx]}"
-        hostname="${item%% *}"
-        if [[ $pos -eq 0 ]]; then
-          ssh_new_window $hostname
-          continue
+    # If only one host is selected, open it in a new pane without creating a new window
+    if [[ $list_length -eq 1 ]]; then
+      hostname="${selection_array[0]%% *}"
+      tmux new-pane -L -h ssh "$hostname"
+
+    # If more than one host multi-selected, open in new windows with panes
+    else
+      while [[ $window_idx -lt $windows ]]; do
+        for ((pos = 0; pos < panes && (window_idx * panes + pos) < list_length; pos++)); do
+          idx=$(((window_idx * panes + pos) % list_length))
+          item="${selection_array[$idx]}"
+          hostname="${item%% *}"
+          if [[ $pos -eq 0 ]]; then
+            ssh_new_window $hostname
+            continue
+          else
+            ssh_new_pane $hostname
+          fi
+        done
+        if [[ $list_length == 2 ]]; then
+          tmux select-layout -t "$target" even-horizontal
         else
-          ssh_new_pane $hostname
+          tmux select-layout tiled
         fi
+        ((++window_idx))
       done
-      if [[ $list_length == 2 ]]; then
-        tmux select-layout -t "$target" even-horizontal
-      else
-        tmux select-layout tiled
-      fi
-      ((++window_idx))
-    done
+    fi
 
   else
     for i in "${selection_array[@]}"; do
