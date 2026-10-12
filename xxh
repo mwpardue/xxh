@@ -3,6 +3,46 @@
 s_flag=0
 SPLIT_KEY=";"
 
+# ============================================================================
+# Helper Functions - Consolidate tmux + SSH commands
+# ============================================================================
+
+# Set pane title to hostname
+set_pane_title() {
+  local hostname="$1"
+  tmux select-pane -T "$hostname"
+}
+
+# Create a new SSH window with auto-switch
+# Used for default (single window per host) mode
+create_ssh_window() {
+  local hostname="$1"
+  tmux new-window -n "$hostname" ssh "$hostname"
+  tmux set pane-border-format "#{pane_title}"
+  set_pane_title "$hostname"
+}
+
+# Create a new SSH window and return target for pane operations
+# Used for '-s' flag mode to add multiple panes to one window
+create_ssh_window_targeted() {
+  local hostname="$1"
+  tmux new-window -n "$hostname" ssh "$hostname"
+  tmux set pane-border-format "#{pane_title}"
+  set_pane_title "$hostname"
+  sleep 0.5
+  tmux display-message -p '#{session_name}:#{window_index}'
+}
+
+# Create a new SSH pane (split) in existing target
+# Automatically sets pane title to hostname
+create_ssh_pane() {
+  local target="$1"
+  local hostname="$2"
+  tmux split-window -t "$target" -h ssh "$hostname"
+  tmux select-pane -t "$target" -T "$hostname"
+  sleep 0.5
+}
+
 while getopts "sk:" opt; do
   case $opt in
   s)
@@ -89,8 +129,9 @@ if [[ -n "$selected_row" ]]; then
   if [[ "$key" == "$SPLIT_KEY" ]]; then
     for i in "${selection_array[@]}"; do
       hostname="${i%% *}"
-      tmux split-window -T "$hostname" -h ssh "$hostname"
-      sleep .3
+      tmux split-window -h ssh "$hostname"
+      set_pane_title "$hostname"
+      sleep 0.3
     done
 
     if [[ ${#selection_array[@]} -le 2 ]]; then
@@ -105,19 +146,11 @@ if [[ -n "$selected_row" ]]; then
     windows=$((($list_length + panes - 1) / panes))
     window_idx=0
 
-    ssh_new_window() {
-      target=$(tmux new-window -n "$1" -P -F '#{session_name}:#{window_index}' ssh $1\; select-pane -T "$1")
-      sleep .5
-    }
-    ssh_new_pane() {
-      tmux split-window -t "$target" -T "$1" -h ssh $1
-      sleep .5
-    }
-
     # If only one host is selected, open it in a new pane without creating a new window
     if [[ $list_length -eq 1 ]]; then
       hostname="${selection_array[0]%% *}"
-      tmux new-pane -L -T "$hostname" -h ssh "$hostname"
+      tmux split-window -h ssh "$hostname"
+      set_pane_title "$hostname"
 
     # If more than one host multi-selected, open in new windows with panes
     else
@@ -127,10 +160,10 @@ if [[ -n "$selected_row" ]]; then
           item="${selection_array[$idx]}"
           hostname="${item%% *}"
           if [[ $pos -eq 0 ]]; then
-            ssh_new_window $hostname
+            target=$(create_ssh_window_targeted "$hostname")
             continue
           else
-            ssh_new_pane $hostname
+            create_ssh_pane "$target" "$hostname"
           fi
         done
         if [[ $list_length == 2 ]]; then
@@ -145,7 +178,7 @@ if [[ -n "$selected_row" ]]; then
   else
     for i in "${selection_array[@]}"; do
       hostname="${i%% *}"
-      tmux new-window -n "${hostname}" ssh $hostname\; select-pane -T "${hostname}"
+      create_ssh_window "$hostname"
     done
   fi
 fi
