@@ -20,7 +20,7 @@ if [[ s_flag -eq 1 ]]; then
   LABEL=" Secure Shell Connections (Split-Windows) "
 fi
 client_width=$(tmux display-message -p '#{client_width}')
-fzf_width=$(($client_width * 40 / 100))
+fzf_width=$(($client_width * 30 / 100))
 
 dir="$HOME/.ssh"
 
@@ -39,7 +39,8 @@ mapfile -t list < <(
     }'
 )
 
-fzf_height=$((${#list[@]} + 4))
+# fzf_height=$((${#list[@]} + 4))
+fzf_height=30
 FMENU=(
   fzf
   --tmux $fzf_width,$fzf_height
@@ -47,16 +48,17 @@ FMENU=(
   --margin=0,0
   --padding=0,1,0,0
   --border=sharp
-  --border=double
+  --border=rounded
   --border-label="$LABEL"
   --border-label-pos=center
   --no-info
   --input-border=line
   --no-separator
+  --scrollbar=▐
   --pointer=''
   --multi
   --color 'fg:7'
-  --color 'bg:-1'
+  --color 'bg:16'
   --color 'current-fg:16'
   --color 'current-bg:10'
   --color 'hl:9'
@@ -67,6 +69,7 @@ FMENU=(
   --color 'prompt:11'
   --color 'marker:11'
   --color 'input-border:5'
+  --color 'scrollbar:7'
   --bind change:top
   --ansi
   --expect="$SPLIT_KEY"
@@ -86,7 +89,7 @@ if [[ -n "$selected_row" ]]; then
   if [[ "$key" == "$SPLIT_KEY" ]]; then
     for i in "${selection_array[@]}"; do
       hostname="${i%% *}"
-      tmux split-window -h ssh "$hostname"
+      tmux split-window -T "$hostname" -h ssh "$hostname"
       sleep .3
     done
 
@@ -103,18 +106,18 @@ if [[ -n "$selected_row" ]]; then
     window_idx=0
 
     ssh_new_window() {
-      target=$(tmux new-window -n "$1" -P -F '#{session_name}:#{window_index}' ssh $1)
+      target=$(tmux new-window -n "$1" -P -F '#{session_name}:#{window_index}' ssh $1\; select-pane -T "$1")
       sleep .5
     }
     ssh_new_pane() {
-      tmux split-window -t "$target" -h ssh $1
+      tmux split-window -t "$target" -T "$1" -h ssh $1
       sleep .5
     }
 
     # If only one host is selected, open it in a new pane without creating a new window
     if [[ $list_length -eq 1 ]]; then
       hostname="${selection_array[0]%% *}"
-      tmux new-pane -L -h ssh "$hostname"
+      tmux new-pane -L -T "$hostname" -h ssh "$hostname"
 
     # If more than one host multi-selected, open in new windows with panes
     else
@@ -142,7 +145,7 @@ if [[ -n "$selected_row" ]]; then
   else
     for i in "${selection_array[@]}"; do
       hostname="${i%% *}"
-      tmux new-window -n "${hostname}" ssh $hostname
+      tmux new-window -n "${hostname}" ssh $hostname\; select-pane -T "${hostname}"
     done
   fi
 fi
